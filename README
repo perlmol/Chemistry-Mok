@@ -1,10 +1,10 @@
-Chemistry/Mok version 0.15
+Chemistry/Mok version 0.16
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
 given in the command line, and for each molecule execute the CODE that is
 given. The CODE is given in Perl and it has at its disposal all of the methods
-of the PerlMol toolkit.
+of the PerlMol toolkit (http://www.perlmol.org/).
 
 This mini-language is intended to provide a powerful environment for writing
 "molecular one-liners" for extracting and munging chemical information.  It was
@@ -17,6 +17,10 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
+CHANGES SINCE VERSION 0.15
+        - Added -b option (add bonds)
+        - Added support for comments outside action blocks
+        - Fixed undef $/ bug.
 
 INSTALLATION
 
@@ -30,13 +34,14 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-        'Chemistry::Mol' => 0.1,
-        'Chemistry::Pattern' => 0.1,
-        'Chemistry::File::SMILES' => 0.21,
-        'Test::Simple' => 0,
-        'Scalar::Util' => 1.01,
-        'Text::Balanced' => 1.87,
-        'Math::VectorReal' => 1.0,
+    'Chemistry::Mol' => 0.23,
+    'Chemistry::Pattern' => 0.10,
+    'Chemistry::File::SMILES' => 0.31,
+    'Chemistry::Bond::Find' => 0.20,
+    'Test::Simple' => 0,
+    'Scalar::Util' => 1.01,
+    'Text::Balanced' => 1.87,
+    'Math::VectorReal' => 1.0,
 
 COPYRIGHT AND LICENCE
 

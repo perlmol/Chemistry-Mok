@@ -1,2 +1,13 @@
-{ $n += $MOL->atoms } 
-END { print "Total: $n atoms\n" }
+# this is a mok program with comments
+
+# block for each molecule
+{ 
+    # let us add the atoms; look, you can ever put a right brace here! }
+    $n += $MOL->atoms # internal comment (handled by perl)
+}   # the block ended
+
+END { print "Total: $n atoms\n" } # this was the end block
+# just a random comment
+
+
+# the end

@@ -1,13 +1,14 @@
-use 5.006001;
+use 5.006;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
     'NAME'		=> 'Chemistry::Mok',
     'VERSION_FROM'	=> 'lib/Chemistry/Mok.pm', 
     'PREREQ_PM'		=> {
-        'Chemistry::Mol' => 0.1,
-        'Chemistry::Pattern' => 0.1,
-        'Chemistry::File::SMILES' => 0.21,
+        'Chemistry::Mol' => 0.23,
+        'Chemistry::Pattern' => 0.10,
+        'Chemistry::File::SMILES' => 0.31,
+        'Chemistry::Bond::Find' => 0.20,
         'Test::Simple' => 0,
         'Scalar::Util' => 1.01,
         'Text::Balanced' => 1.87,

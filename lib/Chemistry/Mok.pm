@@ -1,12 +1,15 @@
 package Chemistry::Mok;
 
-$VERSION = '0.15';
+$VERSION = '0.16';
+# $Id$
+
 use strict;
 use warnings;
 use Chemistry::Mol;
 use Chemistry::File ':auto';
 use Chemistry::Pattern;
-use Text::Balanced 1.87 ':ALL';
+use Chemistry::Bond::Find qw(find_bonds assign_bond_orders);
+use Text::Balanced ':ALL';
 use Scalar::Util 'blessed';
 
 =head1 NAME
@@ -25,7 +28,8 @@ Chemistry::Mok - molecular awk interpreter
 =head1 DESCRIPTION
 
 This module is the engine behind the mok program. See mok(1) for a detailed
-description of the language.
+description of the language. Mok is part of the PerlMol project,
+L<http://www.perlmol.org>.
 
 =head1 METHODS
 
@@ -37,16 +41,19 @@ sub tokenize {
     my ($code) = @_;
 
     $code =~ s/\s*$//;
-    unless($code =~ /^\s*([\/{]|sub|BEGIN|END)/) {
+    unless($code =~ /^\s*([\/{#]|sub|BEGIN|END)/) {
         $code = "{$code}"; # add implicit brackets for simple one-liners
     }
+    #print "code = '$code'\n";
     # (patt opt?)? code | sub code
     my @toks = extract_multiple(my $c = $code,
         [
+            { 'Chemistry::Mok::Comment' => 
+                qr/\s*#.*\s*/ },
             { 'Chemistry::Mok::Patt' => 
                 sub { scalar extract_delimited($_[0],'/') } },
             { 'Chemistry::Mok::Sub'  => 
-                qr/\s*(END|BEGIN|sub \w+)\s*/ },
+                qr/\s*(END|BEGIN|sub\s\w+)\s*/ },
             { 'Chemistry::Mok::Block' => 
                 sub { scalar extract_codeblock($_[0],'{') } },
             { 'Chemistry::Mok::Opts' => 
@@ -91,6 +98,8 @@ sub parse {
             }
         } elsif ($tok->isa("Chemistry::Mok::Block")){
             push @blocks, { patt => '', opts => '', block => $$tok};
+        } elsif ($tok->isa("Chemistry::Mok::Comment")){
+            # do nothing
         } else {
             die "unexpected token $$tok\n";
         }
@@ -183,6 +192,11 @@ The molecule class used for reading the files. Defaults to Chemistry::Mol.
 The format used when calling $mol_class->read. If not given, $mol_class->read
 tries to identify the format automatically.
 
+=item find_bonds
+
+The format used when calling $mol_class->read. If not given, $mol_class->read
+tries to identify the format automatically.
+
 =back
 
 =cut
@@ -194,6 +208,10 @@ sub run {
     FILE: for my $file (@args) {
         my (@mols) = $mol_class->read($file, format => $opt->{format});
         MOL: for my $mol (@mols) {
+            if ($opt->{find_bonds}) {
+                find_bonds($mol) unless $mol->bonds;
+                assign_bond_orders($mol);
+            }
             BLOCK: for my $block (@$self) {
                 my ($code_block, $patt, $patt_str) = 
                     @{$block}{qw(sub patt patt_str)};
@@ -219,11 +237,11 @@ __END__
 
 =head1 VERSION
 
-0.15
+0.16
 
 =head1 SEE ALSO
 
-L<mok>
+L<mok>, L<http://www.perlmol.org/>
 
 =head1 AUTHOR
 

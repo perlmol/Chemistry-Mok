@@ -3,27 +3,28 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.15';
+$VERSION = '0.16';
 use strict;
 use warnings;
 use Chemistry::Mok;
 use Getopt::Std;
 
 my %opt;
-getopts('c:f:t:hv', \%opt);
+getopts('c:f:t:hvb', \%opt);
 usage() if $opt{h};
 
 my $code;
 if ($opt{f}) {
     open F, "< $opt{f}" or die "Couldn't read $opt{f}\n";
-    {local undef $/; $code = <F>;}
+    {local $/; $code = <F>;}
     close F;
 } else {
     $code = shift || usage();
 }
 
 my $mok = Chemistry::Mok->new($code);
-$mok->run({ mol_class => $opt{c}, format => $opt{t} }, @ARGV);
+$mok->run({ mol_class => $opt{c}, format => $opt{t}, 
+    find_bonds => $opt{b} }, @ARGV);
 
 sub usage {
     print <<EOF;
@@ -33,6 +34,7 @@ Read each molecular file and run CODE on each. Options:
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
     -f FILE     run the code from FILE instead of the command line
     -t TYPE     assume that every file has the specified TYPE
+    -b          find bonds
 EOF
     exit;
 }
@@ -89,6 +91,13 @@ Assume that every file has the specified TYPE. Available types depend on
 which Chemistry::File modules are installed, but currently available types
 include mdl, sdf, smiles, formula, mopac, pdb.
 
+=item -b
+
+Find bonds. Use it when reading files with no bond information but 3D
+coordinates to detect the bonds if needed (for example, if you want to do match
+a pattern that includes bonds). If the file has explicit bonds, mok will not
+try to find the bonds, but it will reassing the bond orders from scratch.
+
 =back
 
 =head1 LANGUAGE SPECIFICATION
@@ -102,6 +111,7 @@ language.
     sub name { statements }
     BEGIN { statements }
     END { statements }
+    # comment
 
 When the whole program consists of one unconditional action block, the braces
 may be omitted.
@@ -261,7 +271,7 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.15
+0.16
 
 =head1 AUTHOR
 

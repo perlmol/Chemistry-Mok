@@ -1,5 +1,10 @@
 Revision history for Perl extension Chemistry::Mok.
 
+0.16
+        - Added -b option (add bonds)
+        - Added support for comments outside action blocks
+        - Fixed undef $/ bug.
+
 0.15  Tue Mar 4 2004
         - Bug fixes: pattern options were ignored, -f option didn't work.
         - Changes: special variables $MOL, $PATT, $FILE, $MATCH are now 
