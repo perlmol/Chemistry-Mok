@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 # $Id$
 
 use strict;
@@ -9,6 +9,7 @@ use Chemistry::Mol;
 use Chemistry::File ':auto';
 use Chemistry::Pattern;
 use Chemistry::Bond::Find qw(find_bonds assign_bond_orders);
+use Chemistry::Ring 'aromatize_mol';
 use Text::Balanced ':ALL';
 use Scalar::Util 'blessed';
 
@@ -211,14 +212,16 @@ with runtime options. Available options:
 
 =over
 
-=item mol_class
+=item aromatize          
 
-The molecule class used for reading the files. Defaults to Chemistry::Mol.
+"Aromatize" each molecule as it is read. This is needed for example for
+matching SMARTS patterns that use aromaticity or ring primitives.
 
-=item format
+=item delete_dummies
 
-The format used when calling $mol_class->read. If not given, $mol_class->read
-tries to identify the format automatically.
+Delete dummy atoms after reading each molecule. A dummy atom is defined as an
+atom with an unknown symbol (i.e., it doesn't appear on the periodic table), or
+an atomic number of zero.
 
 =item find_bonds
 
@@ -227,6 +230,15 @@ information but 3D coordinates to detect the bonds if needed (for example, if
 you want to do match a pattern that includes bonds). If the file has explicit
 bonds, mok will not try to find the bonds, but it will reassign the bond orders
 from scratch.
+
+=item format
+
+The format used when calling $mol_class->read. If not given, $mol_class->read
+tries to identify the format automatically.
+
+=item mol_class
+
+The molecule class used for reading the files. Defaults to Chemistry::Mol.
 
 =back
 
@@ -240,9 +252,15 @@ sub run {
         my (@mols) = $mol_class->read($file, format => $opt->{format},
             mol_class => $opt->{mol_class});
         MOL: for my $mol (@mols) {
+            if ($opt->{delete_dummies}) {
+                $_->delete for grep { ! $_->Z } $mol->atoms;
+            }
             if ($opt->{find_bonds}) {
                 find_bonds($mol) unless $mol->bonds;
                 assign_bond_orders($mol);
+            }
+            if ($opt->{aromatize}) {
+                aromatize_mol($mol);
             }
             BLOCK: for my $block (@$self) {
                 my ($code_block, $patt, $patt_str) = 
@@ -267,7 +285,7 @@ __END__
 
 =head1 VERSION
 
-0.22
+0.23
 
 =head1 SEE ALSO
 

@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.22
+Chemistry/Mok version 0.23
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,9 +17,10 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.21
-        - Make sure molecules are read by their default classes instead
-          of Chemistry::Mol.
+CHANGES SINCE VERSION 0.22
+        - New option -d (delete dummies)
+        - don't buffer stdio
+        - New option -a (aromatize)
 
 INSTALLATION
 

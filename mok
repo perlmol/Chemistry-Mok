@@ -3,14 +3,16 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 use strict;
 use warnings;
 use Chemistry::Mok;
 use Getopt::Std;
 
+$| = 1; # don't buffer stdio
+
 my %opt;
-getopts('c:f:t:hvbp:', \%opt);
+getopts('c:f:t:hvbp:da', \%opt);
 usage() if $opt{h};
 
 my $code;
@@ -29,19 +31,30 @@ if ($^O eq 'MSWin32') { # do our own globbing under Windows
 
 my $mok = Chemistry::Mok->new($code, 
     pattern_format => $opt{p} || 'smarts');
-$mok->run({ mol_class => $opt{c}, format => $opt{t}, 
-    find_bonds => $opt{b} }, @files);
+
+$mok->run(
+    { 
+        mol_class => $opt{c}, 
+        format => $opt{t}, 
+        find_bonds => $opt{b},
+        delete_dummies => $opt{d},
+        aromatize => $opt{a},
+    }, 
+    @files
+);
 
 sub usage {
     print <<EOF;
 Usage: $0 [OPTION]...  'CODE' FILE...
 Read each molecular file and run CODE on each. Options:
-    -h          this help
+    -b          find bonds from 3D coordinates
+    -a          "aromatize" each molecule as it is read
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
+    -d          delete dummy atoms after reading each molecule
     -f FILE     run the code from FILE instead of the command line
-    -t TYPE     assume that every file has the specified TYPE
+    -h          this help
     -p TYPE     parse patterns using the specified TYPE. Default: 'smarts'
-    -b          find bonds
+    -t TYPE     assume that every file has the specified TYPE
 EOF
     exit;
 }
@@ -80,9 +93,27 @@ Mok is part of the PerlMol project, L<http://www.perlmol.org>.
 
 =over
 
+=item -a          
+
+"Aromatize" each molecule as it is read. This is needed for example for
+matching SMARTS patterns that use aromaticity or ring primitives.
+
+=item -b
+
+Find bonds. Use it when reading files with no bond information but 3D
+coordinates to detect the bonds if needed (for example, if you want to do match
+a pattern that includes bonds). If the file has explicit bonds, mok will not
+try to find the bonds, but it will reassign the bond orders from scratch.
+
 =item -c CLASS
 
 Use CLASS instead of Chemistry::Mol to read molecules
+
+=item -d
+
+Delete dummy atoms after reading each molecule. A dummy atom is defined as an
+atom with an unknown symbol (i.e., it doesn't appear on the periodic table), or
+an atomic number of zero.
 
 =item -f FILE
 
@@ -92,23 +123,16 @@ Run the code from FILE instead of the command line
 
 Print usage information and exit
 
-=item -t TYPE     
-
-Assume that every file has the specified TYPE. Available types depend on
-which Chemistry::File modules are installed, but currently available types
-include mdl, sdf, smiles, formula, mopac, pdb.
-
 =item -p TYPE     
 
 Parse patterns using the specified TYPE. Default: 'smarts'. Other options are
 'smiles' and 'midas'.
 
-=item -b
+=item -t TYPE     
 
-Find bonds. Use it when reading files with no bond information but 3D
-coordinates to detect the bonds if needed (for example, if you want to do match
-a pattern that includes bonds). If the file has explicit bonds, mok will not
-try to find the bonds, but it will reassign the bond orders from scratch.
+Assume that every file has the specified TYPE. Available types depend on
+which Chemistry::File modules are installed, but currently available types
+include mdl, sdf, smiles, formula, mopac, pdb.
 
 =back
 
@@ -288,7 +312,7 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.22
+0.23
 
 =head1 AUTHOR
 
