@@ -1,0 +1,88 @@
+#!/home/ivan/bin/perl
+
+use strict;
+use warnings;
+use Chemistry::Mol;
+use Chemistry::File ':auto';
+use Chemistry::Pattern;
+use Getopt::Std;
+
+
+# parse_code is at the top of the file to avoid the evaled code block having
+# access to file-scoped lexicals
+sub parse_code {
+    my ($code) = @_;
+    my ($patt_str, $patt_opts, $block) = $code =~ m<^\s*
+        (?:
+            /(.*?)/[gop]*)\s*  # pattern
+        )?
+        {(.*)}          # code block
+    >sxg;
+    $block ||= $code;
+
+    #print "code=$code\npatt=$patt_str\nblock=$block\n"; exit;
+    my $sub = eval <<END;
+        package Mok::UserCode;
+        no strict;
+        no warnings;
+        sub {
+            my (\$mol, \$file, \$match) = \@_;
+            $block;
+        }
+END
+    die $@ if $@;
+
+    my $patt;
+    if ($patt_str) {
+        $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
+        if ($patt_opts =~ /g/i) {
+            $patt->attr(global => 1);
+        }
+    } 
+    ($sub, $patt);
+}
+
+my %opt;
+getopts('f:t:hv', \%opt);
+usage() if $opt{h};
+
+my $code;
+
+if ($opt{f}) {
+    open F, "< $opt{f}" or die "Couldn't read $opt{f}\n";
+    {local undef $/; $code = <F>;}
+    close F;
+} else {
+    $code = shift || usage();
+}
+
+my ($code_block, $patt) = parse_code($code);
+
+for my $file (@ARGV) {
+    my (@mols) = Chemistry::Mol->read($file, format => $opt{t});
+    for my $mol (@mols) {
+        if ($patt) {
+            while ($patt->match($mol)) {
+                $code_block->($mol, $file, $patt);
+                last unless $patt->attr('global');
+            }
+        } else {
+            $code_block->($mol, $file, $patt);
+        }
+    }
+}
+
+sub usage {
+    print <<EOF;
+Usage: $0 [OPTION]...  'CODE' FILE...
+Read each molecular file and run CODE on each. Options:
+    -h          this help
+    -t TYPE     assume that every file has the specified TYPE
+    -f FILE     run the code from FILE instead of the command line
+EOF
+    exit;
+}
+
+package Mok::UserCode;
+use Chemistry::Atom ':all';
+
