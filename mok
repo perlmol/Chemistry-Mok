@@ -3,16 +3,17 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.23';
+$VERSION = '0.24';
 use strict;
 use warnings;
+no warnings qw(once);
 use Chemistry::Mok;
 use Getopt::Std;
 
 $| = 1; # don't buffer stdio
 
 my %opt;
-getopts('c:f:t:hvbp:da', \%opt);
+getopts('c:f:t:hvbp:dazD', \%opt);
 usage() if $opt{h};
 
 my $code;
@@ -29,16 +30,18 @@ if ($^O eq 'MSWin32') { # do our own globbing under Windows
     @files = map glob, @files;
 }
 
+$Chemistry::Mok::DEBUG = 1 if $opt{D};
 my $mok = Chemistry::Mok->new($code, 
     pattern_format => $opt{p} || 'smarts');
 
+
 $mok->run(
     { 
-        mol_class => $opt{c}, 
-        format => $opt{t}, 
-        find_bonds => $opt{b},
-        delete_dummies => $opt{d},
-        aromatize => $opt{a},
+        mol_class       => $opt{c}, 
+        format          => $opt{t}, 
+        find_bonds      => $opt{b},
+        delete_dummies  => $opt{d},
+        aromatize       => $opt{a},
     }, 
     @files
 );
@@ -47,9 +50,10 @@ sub usage {
     print <<EOF;
 Usage: $0 [OPTION]...  'CODE' FILE...
 Read each molecular file and run CODE on each. Options:
-    -b          find bonds from 3D coordinates
     -a          "aromatize" each molecule as it is read
+    -b          find bonds from 3D coordinates
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
+    -D          print debugging information (very verbose)
     -d          delete dummy atoms after reading each molecule
     -f FILE     run the code from FILE instead of the command line
     -h          this help
@@ -115,6 +119,12 @@ Delete dummy atoms after reading each molecule. A dummy atom is defined as an
 atom with an unknown symbol (i.e., it doesn't appear on the periodic table), or
 an atomic number of zero.
 
+=item -D
+
+Print debugging information, such as the way the input program was tokenized
+and parsed into blocks and subs. This may be useful for diagnosing syntax
+errors when the default error mesage is not informative enough.
+
 =item -f FILE
 
 Run the code from FILE instead of the command line
@@ -142,7 +152,7 @@ A Mok script consists of a sequence of pattern-action statements and
 optional subroutine definitions, in a manner very similar to the AWK
 language.
 
-    /pattern/options { action statements }
+    pattern_type:/pattern/options { action statements }
     { action statements }
     sub name { statements }
     BEGIN { statements }
@@ -184,11 +194,12 @@ C<println>, which is defined by C<sub println { print "\@_", "\n" }>.
 =head2 Pattern Specification
 
 The pattern must be a SMARTS string readable by the Chemistry::File::SMARTS
-module, unless a different type is specified by means of the -p option. The
-pattern is given within slashes, in a way reminiscent of AWK and Perl regular
-expressions. As in Perl, certain one-letter options may be included after the
-closing slash. An option is turned on by giving the corresponing lowercase
-letter and turned off by giving the corresponding uppercase letter.
+module, unless a different type is specified by means of the -p option or a
+pattern_type is given explicitly before the pattern itself. The pattern is
+given within slashes, in a way reminiscent of AWK and Perl regular expressions.
+As in Perl, certain one-letter options may be included after the closing slash.
+An option is turned on by giving the corresponing lowercase letter and turned
+off by giving the corresponding uppercase letter.
 
 =over
 
@@ -281,7 +292,7 @@ funcions such as C<next> and C<last>:
 Print the names of all the molecules found in all the .sdf files in the 
 current directory:
 
-    mok 'print $MOL->name, "\n"' *.sdf
+    mok 'println $MOL->name' *.sdf
 
 Find esters among *.mol; print the filename, molecule name, and formula:
 
@@ -301,6 +312,18 @@ Convert PDB files to MDL molfiles:
 
     mok '{ $FILE =~ s/pdb/mol/; $MOL->write($FILE, format => "mdlmol") }' *.pdb
 
+Find molecules with a given formula by overriding the formula pattern type
+globally (this example requires L<Chemistry::FormulatPattern>):
+
+    mok -p formula_pattern '/C6H12O6/{ println $MOL->name }' *.sdf
+
+Find molecules with a given formula by overriding the formula pattern type
+just for one specific pattern. This can be used when more than one pattern
+type is needed in one script.
+
+    mok 'formula_pattern:/C6H12O6/{ println $MOL->name }' *.sdf
+
+
 =head1 SEE ALSO
 
 awk(1), perl(1)
@@ -308,11 +331,14 @@ L<Chemistry::Mok>,
 L<Chemistry::Mol>, L<Chemistry::Pattern>,
 L<http://dmoz.org/Arts/Animation/Cartoons/Titles/T/Thundarr_the_Barbarian/>.
 
+Tubert-Brohman, I. Perl and Chemistry. The Perl Journal 2004-06 
+(L<http://www.tpj.com/documents/s=7618/tpj0406/>).
+
 The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.23
+0.24
 
 =head1 AUTHOR
 
@@ -320,7 +346,7 @@ Ivan Tubert-Brohman E<lt>itub@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Ivan Tubert-Brohman. All rights reserved. This program is
+Copyright (c) 2005 Ivan Tubert-Brohman. All rights reserved. This program is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 

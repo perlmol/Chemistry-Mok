@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.23';
+$VERSION = '0.24';
 # $Id$
 
 use strict;
@@ -12,6 +12,10 @@ use Chemistry::Bond::Find qw(find_bonds assign_bond_orders);
 use Chemistry::Ring 'aromatize_mol';
 use Text::Balanced ':ALL';
 use Scalar::Util 'blessed';
+use Data::Dumper;
+use Carp;
+
+our $DEBUG = 0;
 
 =head1 NAME
 
@@ -58,12 +62,15 @@ sub tokenize {
                 qr/\s*(END|BEGIN|sub\s\w+)\s*/ },
             { 'Chemistry::Mok::Block' => 
                 sub { scalar extract_codeblock($_[0],'{') } },
+            { 'Chemistry::Mok::PattLang' => 
+                qr/\s*(\w+):(?=\s*\/)/ },
             { 'Chemistry::Mok::Opts' => 
                 qr/[gopGOP]+/ },
         ],
     );
     die "Mok: error extracting: $@" if $@;
-    #use Data::Dumper; print Dumper \@toks; print "$code\n";
+    print "TOKENS:\n", Dumper(\@toks), "\nCODE:<<<<$code>>>>\n\n"
+        if $DEBUG;
     @toks;
 }
 
@@ -74,38 +81,61 @@ sub parse {
     for my $tok (@toks) {
         blessed $tok or die "unparsable token '$tok'\n";
     }
+
+###  new parser
+
+    my $st = 1;
+    my ($patt, $opts, $block, $sub, $pattlang) = ('') x 5;
+    my ($save) = 0;
     while (my $tok = shift @toks) {
-        #print "tok = $$tok\n";
-        if ($tok->isa("Chemistry::Mok::Sub")) {
-            my $next = shift @toks 
-                or die "unexpected end of mok program after $$tok\n";
-            if ($next->isa("Chemistry::Mok::Block")) {
-                push @subs, "$$tok $$next";
-            } else {
-                die "unexpected token $$tok after Sub; expected Block\n";
+        next if $tok->isa("Chemistry::Mok::Comment");
+        if ($st == 1) {
+            if ($tok->isa("Chemistry::Mok::Block")){
+                $block = $$tok,     $save = 1;
+            } elsif ($tok->isa("Chemistry::Mok::Sub")) {
+                $sub = $$tok,       $st = 5,    next;
+            } elsif ($tok->isa("Chemistry::Mok::PattLang")) {
+                $pattlang = $$tok,  $st = 4,    next;
+            } elsif ($tok->isa("Chemistry::Mok::Patt")) {
+                $patt = $$tok,      $st = 2,    next;
             }
-        } elsif ($tok->isa("Chemistry::Mok::Patt")) {
-            my $next = shift @toks
-                or die "unexpected end of mok program after $$tok\n";
-            my $opts = '';
-            if ($next->isa("Chemistry::Mok::Opts")) {
-                $opts = $$next;
-                $next = shift @toks
-                    or die "unexpected end of mok program after $$tok\n";
+        } elsif ($st == 2) {
+            if ($tok->isa("Chemistry::Mok::Block")){
+                $block = $$tok,     $save = 1;
+            } elsif ($tok->isa("Chemistry::Mok::Opts")){
+                $opts = $$tok,      $st = 3,    next;
             }
-            if ($next->isa("Chemistry::Mok::Block")) {
-                push @blocks, { patt => $$tok, opts => $opts, block => $$next};
-            } else {
-                die "unexpected token $$tok after Patt; expected Block\n";
+        } elsif ($st == 3) {
+            if ($tok->isa("Chemistry::Mok::Block")){
+                $block = $$tok,     $save = 1;
             }
-        } elsif ($tok->isa("Chemistry::Mok::Block")){
-            push @blocks, { patt => '', opts => '', block => $$tok};
-        } elsif ($tok->isa("Chemistry::Mok::Comment")){
-            # do nothing
+        } elsif ($st == 4) {
+            if ($tok->isa("Chemistry::Mok::Patt")){
+                $patt = $$tok,      $st = 2,    next;
+            }
+        } elsif ($st == 5) {
+            if ($tok->isa("Chemistry::Mok::Block")){
+                $block = $$tok,     $save = 1;
+            }
         } else {
-            die "unexpected token $$tok\n";
+            confess "unknown state '$st'";
+        }
+        if ($save) { # save block and go back to state 1
+            if ($sub) {
+                push @subs, "$sub $$tok";
+            } else {
+                push @blocks, { patt => $patt, opts => $opts, 
+                    pattlang => $pattlang, block => $$tok};
+            }
+            $patt = $opts = $pattlang = $block = $sub = '';
+            $st = 1,    $save = 0,  next;
+        } else {
+            die "unexpected token '$$tok' (type '" . ref($tok) . "'\n";
         }
     }
+    print "BLOCKS\n", Dumper(\@blocks), "\nSUBS:\n", Dumper(\@subs), "\n"
+        if $DEBUG;
+
     \@subs, \@blocks;
 }
 
@@ -147,7 +177,8 @@ END
         if ($block->{patt}) {
             $block->{patt} =~ m#^/(.*)/$#;
             $patt_str = $1;
-            $patt = Chemistry::Pattern->parse($patt_str, format => $format);
+            $patt = Chemistry::Pattern->parse($patt_str, 
+                format => $block->{pattlang} || $format);
             $patt->attr(global => 1) if $block->{opts} =~ /g/;
             $patt->options(overlap => 0) if $block->{opts} =~ /O/;
             $patt->options(permute => 1) if $block->{opts} =~ /p/;
@@ -174,9 +205,10 @@ varaibles, in order to avoid namespace clashes.
 
 =item C<pattern_format>
 
-The name of the format which will be used for parsing slash-delimited patterns.
-Mok versions until 0.16 only used the 'smiles' format, but newer versions can
-use the 'smarts' format as well.
+The name of the format which will be used for parsing slash-delimited patterns
+that don't define an explicit format. Mok versions until 0.16 only used the
+'smiles' format, but newer versions can use other formats such as 'smarts',
+'midas', 'formula_pattern', and 'sln', if available. The default is 'smarts'.
 
 =back
 
@@ -189,7 +221,7 @@ sub new {
     %opts = @a;
         
     my $usr_pack = $opts{package} || "Default"; 
-    my $format   = $opts{pattern_format} || "smiles"; 
+    my $format   = $opts{pattern_format} || "smarts"; 
 
     # import convenience functions into the user's namespace
     eval <<EVAL;
@@ -249,8 +281,11 @@ sub run {
     # MAIN LOOP
     my $mol_class = $opt->{mol_class} || "Chemistry::Mol";
     FILE: for my $file (@args) {
-        my (@mols) = $mol_class->read($file, format => $opt->{format},
-            mol_class => $opt->{mol_class});
+        my (@mols) = $mol_class->read(
+            $file, 
+            format      => $opt->{format},
+            mol_class   => $opt->{mol_class},
+        );
         MOL: for my $mol (@mols) {
             if ($opt->{delete_dummies}) {
                 $_->delete for grep { ! $_->Z } $mol->atoms;
@@ -278,6 +313,7 @@ sub run {
     }
 }
 
+1;
 
 __END__
 
@@ -285,7 +321,7 @@ __END__
 
 =head1 VERSION
 
-0.23
+0.24
 
 =head1 SEE ALSO
 
@@ -297,7 +333,7 @@ Ivan Tubert-Brohman E<lt>itub@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Ivan Tubert-Brohman. All rights reserved. This program is
+Copyright (c) 2005 Ivan Tubert-Brohman. All rights reserved. This program is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 

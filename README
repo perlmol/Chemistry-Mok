@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.23
+Chemistry/Mok version 0.24
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,10 +17,9 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.22
-        - New option -d (delete dummies)
-        - don't buffer stdio
-        - New option -a (aromatize)
+CHANGES SINCE VERSION 0.23
+    - Added -D option
+    - Added support for multiple pattern languages on the same script.
 
 INSTALLATION
 
@@ -34,18 +33,18 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-        'Chemistry::Mol' => 0.25,
-        'Chemistry::Pattern' => 0.21,
-        'Chemistry::File::SMARTS' => 0.11,
-        'Chemistry::Bond::Find' => 0.21,
-        'Test::Simple' => 0,
-        'Scalar::Util' => 1.01,
-        'Text::Balanced' => 1.87,
-        'Math::VectorReal' => 1.0,
+        Chemistry::Mol          => 0.25,
+        Chemistry::Pattern      => 0.21,
+        Chemistry::File::SMARTS => 0.11,
+        Chemistry::Bond::Find   => 0.21,
+        Test::Simple            => 0,
+        Scalar::Util            => 1.01,
+        Text::Balanced          => 1.87,
+        Math::VectorReal        => 1.0,
 
 COPYRIGHT AND LICENSE
 
-Copyright (C) 2004 Ivan Tubert-Brohman <itub@cpan.org>
+Copyright (C) 2005 Ivan Tubert-Brohman <itub@cpan.org>
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
