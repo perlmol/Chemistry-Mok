@@ -88,3 +88,72 @@ EOF
 package Mok::UserCode;
 use Chemistry::Atom ':all';
 
+__END__
+
+=head1 TITLE
+
+mok - molawk - an awk for molecules
+
+=head1 SYNOPSIS
+
+    mok [OPTION]...  'CODE' FILE...   
+
+=head1 DESCRIPTION
+
+The function of mok is:
+
+To read all the molecules found in the files that are
+given in the command line.
+
+Loop, for each molecule execute the CODE that is given. The code is in Perl,
+but it has at its disposal all the methods of the PerlMol toolkit.
+
+This program is inspired by: 
+
+The awk(1) programming language by Aho, Kernighan, and  Weinberger.
+The SMARTS molecular pattern description language.
+The Perl programming language by Larry Wall.
+
+=head1 OPTIONS
+
+=over
+
+=item -f FILE
+
+run the code from FILE instead of the command line
+
+=item -h  
+
+print usage information and exit
+
+=item -t TYPE     
+
+assume that every file has the specified TYPE. Available types depend on
+which Chemistry::File modules are installed, but currently available types
+include mdl, sdf, smiles, formula, mopac, pdb.
+
+=back
+
+=head1 EXAMPLES
+
+    mok '/C(=O)OC/{ printf "$file: %s (%s)\n", 
+        $mol->name, $mol->formula }' *.mol
+
+Finds esters among *.mol; prints the filename, molecule name, and formula.
+
+=head1 SEE ALSO
+
+awk(1)
+
+=head1 AUTHOR
+
+Ivan Tubert E<lt>itub@cpan.orgE<gt>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2003 Ivan Tubert. All rights reserved. This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
+
+=cut
+
