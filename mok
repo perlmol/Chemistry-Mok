@@ -6,42 +6,127 @@ use Chemistry::Mol;
 use Chemistry::File ':auto';
 use Chemistry::Pattern;
 use Getopt::Std;
+use Text::Balanced ':ALL';
+use Scalar::Util 'blessed';
 
+sub tokenize {
+    my ($code) = @_;
 
-# parse_code is at the top of the file to avoid the evaled code block having
-# access to file-scoped lexicals
+    $code =~ s/\s*$//;
+    unless($code =~ /^\s*([\/{]|sub|BEGIN|END)/) {
+        $code = "{$code}"; # add implicit brackets for simple one-liners
+    }
+    # (patt opt?)? code | sub code
+    my @toks = extract_multiple(my $c = $code,
+        [
+            { 'Chemistry::Mok::Patt' => 
+                sub { scalar extract_delimited($_[0],'/') } },
+            { 'Chemistry::Mok::Sub'  => 
+                qr/\s*(END|BEGIN|sub \w+)\s*/ },
+            { 'Chemistry::Mok::Block' => 
+                sub { scalar extract_codeblock($_[0],'{') } },
+            { 'Chemistry::Mok::Opts' => 
+                qr/[gopGOP]+/ },
+        ],
+    );
+    die $@ if $@;
+    #use Data::Dumper; print Dumper \@toks; print "$code\n";
+    @toks;
+}
+
+sub parse {
+    my (@toks)  = @_;
+
+    my (@subs, @blocks);
+    for my $tok (@toks) {
+        blessed $tok or die "unparsable token '$tok'\n";
+    }
+    while (my $tok = shift @toks) {
+        #print "tok = $$tok\n";
+        if ($tok->isa("Chemistry::Mok::Sub")) {
+            my $next = shift @toks 
+                or die "unexpected end of mok program after $$tok\n";
+            if ($next->isa("Chemistry::Mok::Block")) {
+                push @subs, "$$tok $$next";
+            } else {
+                die "unexpected token $$tok after Sub; expected Block\n";
+            }
+        } elsif ($tok->isa("Chemistry::Mok::Patt")) {
+            my $next = shift @toks
+                or die "unexpected end of mok program after $$tok\n";
+            my $opts = '';
+            if ($next->isa("Chemistry::Mok::Opts")) {
+                $opts = $$tok;
+                $next = shift @toks
+                    or die "unexpected end of mok program after $$tok\n";
+            }
+            if ($next->isa("Chemistry::Mok::Block")) {
+                push @blocks, { patt => $$tok, opts => $opts, block => $$next};
+            } else {
+                die "unexpected token $$tok after Patt; expected Block\n";
+            }
+        } elsif ($tok->isa("Chemistry::Mok::Block")){
+            push @blocks, { patt => '', opts => '', block => $$tok};
+        } else {
+            die "unexpected token $$tok\n";
+        }
+    }
+    \@subs, \@blocks;
+}
+
+sub compile_subs {
+    my (@subs) = @{$_[0]};
+    for my $sub (@subs) {
+        eval <<END;
+            package Chemistry::Mok::UserCode;
+            no strict;
+            no warnings;
+            $sub
+END
+        die $@ if $@;
+    }
+}
+
+sub compile_blocks {
+    my (@blocks) = @{$_[0]};
+    my @compiled_blocks;
+
+    for my $block (@blocks) {
+        my $code = $block->{block};
+        my $sub = eval <<END;
+            package Chemistry::Mok::UserCode;
+            no strict;
+            no warnings;
+            sub {
+                my (\$mol, \$file, \$match, \$patt) = \@_;
+                $block->{block};
+            }
+END
+        die $@ if $@;
+
+        my ($patt, $patt_str);
+        if ($block->{patt}) {
+            $block->{patt} =~ m#^/(.*)/$#;
+            $patt_str = $1;
+            $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
+            $patt->attr(global => 1) if $block->{opts} =~ /g/;
+            $patt->options(overlap => 0) if $block->{opts} =~ /O/;
+            $patt->options(permute => 1) if $block->{opts} =~ /p/;
+        } 
+        push @compiled_blocks, {'sub' => $sub, 
+            patt => $patt, patt_str => $patt_str};
+    }
+    @compiled_blocks;
+}
+
 sub parse_code {
     my ($code) = @_;
-    my ($patt_str, $patt_opts, $block) = $code =~ m<^\s*
-        (?:
-            /(.*?)/([goOpP]*)\s*  # pattern
-        )?
-        {(.*)}          # code block
-    >sxg;
-    $block ||= $code;
+    my ($patt_str, $patt_opts, $block) ;
 
-    #print "code=$code\npatt=$patt_str\nblock=$block\n"; exit;
-    my $sub = eval <<END;
-        package Mok::UserCode;
-        no strict;
-        no warnings;
-        sub {
-            my (\$mol, \$file, \$match) = \@_;
-            $block;
-        }
-END
-    die $@ if $@;
-
-    my $patt;
-    if ($patt_str) {
-        $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
-        $patt->attr(global => 1) if $patt_opts =~ /g/;
-        $patt->options(overlap => 1) if $patt_opts =~ /o/;
-        $patt->options(overlap => 0) if $patt_opts =~ /O/;
-        $patt->options(permute => 1) if $patt_opts =~ /p/;
-        $patt->options(permute => 0) if $patt_opts =~ /P/;
-    } 
-    ($sub, $patt);
+    my @toks = tokenize($code);
+    my ($subs, $blocks) = parse(@toks);
+    compile_subs($subs);
+    return compile_blocks($blocks);
 }
 
 my %opt;
@@ -58,18 +143,23 @@ if ($opt{f}) {
     $code = shift || usage();
 }
 
-my ($code_block, $patt) = parse_code($code);
+my (@blocks) = parse_code($code);
 
-for my $file (@ARGV) {
+# MAIN LOOP
+FILE: for my $file (@ARGV) {
     my (@mols) = Chemistry::Mol->read($file, format => $opt{t});
-    for my $mol (@mols) {
-        if ($patt) {
-            while ($patt->match($mol)) {
-                $code_block->($mol, $file, $patt);
-                last unless $patt->attr('global');
+    MOL: for my $mol (@mols) {
+        BLOCK: for my $block (@blocks) {
+            my ($code_block, $patt, $patt_str) = 
+                @{$block}{qw(sub patt patt_str)};
+            if ($patt) {
+                MATCH: while ($patt->match($mol)) {
+                    $code_block->($mol, $file, $patt, $patt_str);
+                    last unless $patt->attr('global');
+                }
+            } else {
+                $code_block->($mol, $file, $patt, $patt_str);
             }
-        } else {
-            $code_block->($mol, $file, $patt);
         }
     }
 }
@@ -85,14 +175,14 @@ EOF
     exit;
 }
 
-package Mok::UserCode;
+package Chemistry::Mok::UserCode;
 use Chemistry::Atom ':all';
 
 __END__
 
 =head1 TITLE
 
-mok - molawk - an awk for molecules
+mok - mok - an awk for molecules
 
 =head1 SYNOPSIS
 
@@ -100,19 +190,21 @@ mok - molawk - an awk for molecules
 
 =head1 DESCRIPTION
 
-The function of mok is:
+The purpose of mok is to read all the molecules found in the files that are
+given in the command line, and for each molecule execute the CODE that is
+given. The CODE is given in Perl and it has at its disposal all of the methods
+of the PerlMol toolkit.
 
-To read all the molecules found in the files that are
-given in the command line.
+This mini-language is intended to provide a powerful environment for writing
+"molecular one-liners" for extracting and munging chemical information.  It was
+inspired by the AWK programming language by Aho, Kernighan, and Weinberger,
+the SMARTS molecular pattern description language by Daylight, Inc., and the
+Perl programming language by Larry Wall.
 
-Loop, for each molecule execute the CODE that is given. The code is in Perl,
-but it has at its disposal all the methods of the PerlMol toolkit.
-
-This program is inspired by: 
-
-The awk(1) programming language by Aho, Kernighan, and  Weinberger.
-The SMARTS molecular pattern description language.
-The Perl programming language by Larry Wall.
+Mok takes its name from Ookla the mok, an unforgettable character from the
+animated TV series "Thundar the Barbarian", and from shortening "molecular
+awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
+below.
 
 =head1 OPTIONS
 
@@ -120,30 +212,159 @@ The Perl programming language by Larry Wall.
 
 =item -f FILE
 
-run the code from FILE instead of the command line
+Run the code from FILE instead of the command line
 
 =item -h  
 
-print usage information and exit
+Print usage information and exit
 
 =item -t TYPE     
 
-assume that every file has the specified TYPE. Available types depend on
+Assume that every file has the specified TYPE. Available types depend on
 which Chemistry::File modules are installed, but currently available types
 include mdl, sdf, smiles, formula, mopac, pdb.
 
 =back
 
+=head1 LANGUAGE SPECIFICATION
+
+A mok script consists of a sequence of pattern-action statements and
+optional subroutine definitions, in a manner very similar to the AWK
+language.
+
+    /pattern/options { action statements }
+    { action statements }
+    sub name { statements }
+    BEGIN { statements }
+    END { statements }
+
+When the whole program consists of one unconditional action block, the braces
+may be omitted.
+
+Program execution is as follows:
+
+1) The BEGIN block is executed as soon as it's compiled, before any other
+actions are taken.
+
+2) For each molecule in the files given in the command line, each pattern is 
+applied in turn; if the pattern matches, the corresponding statement block
+is executed. The pattern is optional; statement blocks without a pattern are
+executed unconditionally. Subroutines are only executed when called explicitly.
+
+3) Finally, the END block is executed.
+
+The statements are evaluated as Perl statements in the Chemistry::Mok::UserCode
+package.  The following chemistry modules are conveniently loaded by default:
+
+    Chemistry::Mol;
+    Chemistry::Atom 'distance', 'angle', 'dihedral';
+    Chemistry::Bond;
+    Chemistry::Pattern;
+    Chemistry::Pattern::Atom;
+    Chemistry::Pattern::Bond;
+    Chemistry::File;
+    Chemistry::File::*;
+
+=head2 Pattern Specification
+
+The pattern must be a SMILES string readable by the Chemistry::File::SMILES
+module. There is plan for SMARTS support in the future. The pattern is
+specified within slashes, in a way reminiscent of AWK and Perl regular
+expressions. As in Perl, certain one-letter options may be included after the
+closing slash. An option is turned on by giving the corresponing lowercase
+letter and turned off by giving the corresponding uppercase letter.
+
+=over
+
+=item g/G
+
+Match globally (default: off). When not present, the mok interpreter only
+matches a molecule once; when present, it tries matching again in other parts
+of the molecule. For example, /C/ matches butane only once (at an unspecified
+atom), while /C/g matches four times (once at each atom).
+
+=item o/O
+
+Overlap (default: on). When set and matching globally, matches may overlap. For
+example, /CC/go pattern could match twice on propane, but /CC/gO would match
+only once.
+
+=item p/P
+
+Permute (default: off). Sometimes there is more than one way of matching the
+same set of pattern atoms on the same set of molecule atoms. If true, return
+these "redundant" matches.  For example, /CC/gp could match ethane with
+two different permutations (forwards and backwards). 
+
+=back
+
+=head2 Special Variables
+
+When blocks with action statements are executed, the following variables
+are defined automatically:
+
+=over
+
+=item $file
+
+The current filename.
+
+=item $mol
+
+The current molecule as a Chemistry::Mol object.
+
+=item $match
+
+The current match as a Chemistry::Pattern object.
+
+=item $patt
+
+The current pattern as a SMILES string.
+
+=back
+
+=head2 Special Blocks
+
+Within action blocks, the following block names can be used with Perl 
+funcions such as next and last:
+
+=over
+
+=item MATCH
+
+=item BLOCK
+
+=item MOL
+
+=item FILE
+
+=back
+
 =head1 EXAMPLES
+
+    mok 'print $mol->name, "\n"' *.sdf
+
+Prints the names of all the molecules found in all the .sdf files in the 
+current directory.
 
     mok '/C(=O)OC/{ printf "$file: %s (%s)\n", 
         $mol->name, $mol->formula }' *.mol
 
 Finds esters among *.mol; prints the filename, molecule name, and formula.
 
+    mok '{ $n += $mol->atoms } END { print "Total: $n atoms\n" }' *.mol
+
+Find out the total number of atoms.
+
+    mok '/CS/g{ $n++; $l += $match->bond_map(0)->length }
+        END { printf "Average C-S bond length: %.3f\n", $l/$n; }' *.mol
+
+Find out the average C-S bond length.
+
 =head1 SEE ALSO
 
-awk(1)
+awk(1), perl(1)
+L<Chemistry::Mol>, L<Chemistry::Pattern>
 
 =head1 AUTHOR
 
@@ -151,7 +372,7 @@ Ivan Tubert E<lt>itub@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2003 Ivan Tubert. All rights reserved. This program is free
+Copyright (c) 2004 Ivan Tubert. All rights reserved. This program is free
 software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 
