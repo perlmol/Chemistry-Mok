@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.20
+Chemistry/Mok version 0.21
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,10 +17,10 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.16
-    - Support for different pattern languages.
-    - User package now imports from Chemistry::Atom and Math::VectorReal.
-    - Fixed error when an implicit block had leading comments.
+CHANGES SINCE VERSION 0.20
+        - Added the println function.
+        - Changed tests for better MSWin32 compatibility.
+        - Made SMARTS the default pattern language; added -p option.
 
 INSTALLATION
 
@@ -34,18 +34,18 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-    'Chemistry::Mol' => 0.23,
-    'Chemistry::Pattern' => 0.10,
-    'Chemistry::File::SMILES' => 0.31,
-    'Chemistry::Bond::Find' => 0.20,
-    'Test::Simple' => 0,
-    'Scalar::Util' => 1.01,
-    'Text::Balanced' => 1.87,
-    'Math::VectorReal' => 1.0,
+        'Chemistry::Mol' => 0.23,
+        'Chemistry::Pattern' => 0.10,
+        'Chemistry::File::SMARTS' => 0.10,
+        'Chemistry::Bond::Find' => 0.20,
+        'Test::Simple' => 0,
+        'Scalar::Util' => 1.01,
+        'Text::Balanced' => 1.87,
+        'Math::VectorReal' => 1.0,
 
-COPYRIGHT AND LICENCE
+COPYRIGHT AND LICENSE
 
-Copyright (C) 2004 Ivan Tubert <itub@cpan.org>
+Copyright (C) 2004 Ivan Tubert-Brohman <itub@cpan.org>
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

@@ -3,14 +3,14 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.20';
+$VERSION = '0.21';
 use strict;
 use warnings;
 use Chemistry::Mok;
 use Getopt::Std;
 
 my %opt;
-getopts('c:f:t:hvbs', \%opt);
+getopts('c:f:t:hvbp:', \%opt);
 usage() if $opt{h};
 
 my $code;
@@ -22,10 +22,15 @@ if ($opt{f}) {
     $code = shift || usage();
 }
 
+my @files = @ARGV;
+if ($^O eq 'MSWin32') { # do our own globbing under Windows
+    @files = map glob, @files;
+}
+
 my $mok = Chemistry::Mok->new($code, 
-    pattern_format => $opt{s} ? 'smarts' : 'smiles');
+    pattern_format => $opt{p} || 'smarts');
 $mok->run({ mol_class => $opt{c}, format => $opt{t}, 
-    find_bonds => $opt{b} }, @ARGV);
+    find_bonds => $opt{b} }, @files);
 
 sub usage {
     print <<EOF;
@@ -35,6 +40,7 @@ Read each molecular file and run CODE on each. Options:
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
     -f FILE     run the code from FILE instead of the command line
     -t TYPE     assume that every file has the specified TYPE
+    -p TYPE     parse patterns using the specified TYPE. Default: SMARTS
     -b          find bonds
 EOF
     exit;
@@ -129,23 +135,28 @@ executed unconditionally. Subroutines are only executed when called explicitly.
 
 3) Finally, the END block is executed.
 
-The statements are evaluated as Perl statements in the Chemistry::Mok::UserCode
-package.  The following chemistry modules are conveniently loaded by default:
+The statements are evaluated as Perl statements in the
+Chemistry::Mok::UserCode::Default package. The following chemistry modules are
+conveniently loaded by default:
 
     Chemistry::Mol;
-    Chemistry::Atom 'distance', 'angle', 'dihedral';
+    Chemistry::Atom ':all';
     Chemistry::Bond;
     Chemistry::Pattern;
     Chemistry::Pattern::Atom;
     Chemistry::Pattern::Bond;
     Chemistry::File;
     Chemistry::File::*;
+    Math::VectorReal ':all';
+
+Besides these, there is one more function available for convenience:
+C<println>, which is defined by C<sub println { print "\@_", "\n" }>.
 
 =head2 Pattern Specification
 
-The pattern must be a SMILES string readable by the Chemistry::File::SMILES
-module. There is plan for SMARTS support in the future. The pattern is
-specified within slashes, in a way reminiscent of AWK and Perl regular
+The pattern must be a SMARTS string readable by the Chemistry::File::SMARTS
+module, unless a different type is specified by means of the -p option. The
+pattern is given within slashes, in a way reminiscent of AWK and Perl regular
 expressions. As in Perl, certain one-letter options may be included after the
 closing slash. An option is turned on by giving the corresponing lowercase
 letter and turned off by giving the corresponding uppercase letter.
@@ -201,7 +212,7 @@ A reference to the current match as a Chemistry::Pattern object.
 
 =item $PATT
 
-The current pattern as a SMILES string.
+The current pattern as a string.
 
 =item @A
 
@@ -222,7 +233,7 @@ numbering used by most file types and some PerlMol methods.
 =head2 Special Blocks
 
 Within action blocks, the following block names can be used with Perl 
-funcions such as next and last:
+funcions such as C<next> and C<last>:
 
 =over
 
@@ -272,16 +283,16 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.20
+0.21
 
 =head1 AUTHOR
 
-Ivan Tubert E<lt>itub@cpan.orgE<gt>
+Ivan Tubert-Brohman E<lt>itub@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Ivan Tubert. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms as
+Copyright (c) 2004 Ivan Tubert-Brohman. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 
 =cut

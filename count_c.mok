@@ -1,2 +1,2 @@
 /C/g{ $n++ } 
-END { print "Total: $n carbon atoms\n" }
+END { print qq{Total: $n carbon atoms\n} }

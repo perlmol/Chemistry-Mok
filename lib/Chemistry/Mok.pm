@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.20';
+$VERSION = '0.21';
 # $Id$
 
 use strict;
@@ -191,9 +191,12 @@ sub new {
     my $format   = $opts{pattern_format} || "smiles"; 
 
     # import convenience functions into the user's namespace
-    eval "package Chemistry::Mok::UserCode::$usr_pack;
+    eval <<EVAL;
+          package Chemistry::Mok::UserCode::$usr_pack;
           Chemistry::Atom->import(':all');
-          Math::VectorReal->import(':all');";  
+          Math::VectorReal->import(':all');
+          sub println { print "\@_", "\n" }
+EVAL
     my @toks = tokenize($code);
     my ($subs, $blocks) = parse(@toks);
     compile_subs($usr_pack, @$subs);
@@ -263,7 +266,7 @@ __END__
 
 =head1 VERSION
 
-0.20
+0.21
 
 =head1 SEE ALSO
 
@@ -271,12 +274,12 @@ L<mok>, L<http://www.perlmol.org/>
 
 =head1 AUTHOR
 
-Ivan Tubert E<lt>itub@cpan.orgE<gt>
+Ivan Tubert-Brohman E<lt>itub@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Ivan Tubert. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms as
+Copyright (c) 2004 Ivan Tubert-Brohman. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 
 =cut

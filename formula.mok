@@ -1,1 +1,1 @@
-{ printf "$FILE: %s (%s)\n", $MOL->name, $MOL->formula }
+{ printf qq{$FILE: %s (%s)\n}, $MOL->name, $MOL->formula }

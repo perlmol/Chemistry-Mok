@@ -1,5 +1,11 @@
 Revision history for Perl extension Chemistry::Mok.
 
+0.21  Fri Jun 18 2004
+        - Made SMARTS the default pattern language; added -p option.
+        - Added the println function.
+        - Added implicit globbing to mok under MSWin32.
+        - Changed tests for better MSWin32 compatibility.
+
 0.20  Thu Jun 10 2004
         - Support for different pattern languages.
         - User package now imports from Chemistry::Atom and Math::VectorReal.

@@ -7,7 +7,7 @@ WriteMakefile(
     'PREREQ_PM'		=> {
         'Chemistry::Mol' => 0.23,
         'Chemistry::Pattern' => 0.10,
-        'Chemistry::File::SMILES' => 0.31,
+        'Chemistry::File::SMARTS' => 0.10,
         'Chemistry::Bond::Find' => 0.20,
         'Test::Simple' => 0,
         'Scalar::Util' => 1.01,

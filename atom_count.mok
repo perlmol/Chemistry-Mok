@@ -2,7 +2,7 @@
 # this is a mok program with comments
 
 # this is a hack to make the program executable
-BEGIN { $0 =~ /(^|\/)mok$/ or exec "mok -f $0 @ARGV" }
+BEGIN { $0 =~ /(^|\/)mok$/ or exec qq{mok -f $0 @ARGV} }
 
 # block for each molecule
 { 
@@ -10,7 +10,7 @@ BEGIN { $0 =~ /(^|\/)mok$/ or exec "mok -f $0 @ARGV" }
     $n += $MOL->atoms # internal comment (handled by perl)
 }   # the block ended
 
-END { print "Total: $n atoms\n" } # this was the end block
+END { print qq{Total: $n atoms\n} } # this was the end block
 # just a random comment
 
 
