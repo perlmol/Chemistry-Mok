@@ -80,7 +80,7 @@ sub parse {
                 or die "unexpected end of mok program after $$tok\n";
             my $opts = '';
             if ($next->isa("Chemistry::Mok::Opts")) {
-                $opts = $$tok;
+                $opts = $$next;
                 $next = shift @toks
                     or die "unexpected end of mok program after $$tok\n";
             }
@@ -116,6 +116,7 @@ sub compile_blocks {
     my @compiled_blocks;
 
     for my $block (@blocks) {
+        #use Data::Dumper; print Dumper $block;
         my $code = $block->{block};
         my $sub = eval <<END;
             package Chemistry::Mok::UserCode::$pack;

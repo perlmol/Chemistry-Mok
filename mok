@@ -23,7 +23,7 @@ if ($opt{f}) {
 }
 
 my $mok = Chemistry::Mok->new($code);
-$mok->run({ mol_class => $opt{c}, format => $opt{f} }, @ARGV);
+$mok->run({ mol_class => $opt{c}, format => $opt{t} }, @ARGV);
 
 sub usage {
     print <<EOF;
