@@ -1,0 +1,2 @@
+{ $n += $MOL->atoms } 
+END { print "Total: $n atoms\n" }

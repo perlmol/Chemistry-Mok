@@ -1,9 +1,9 @@
 #!/home/ivan/bin/perl
 
-# mok command line interpreter. This is part of the Chemistry::Mok
+# Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.10';
+$VERSION = '0.15';
 use strict;
 use warnings;
 use Chemistry::Mok;
@@ -41,7 +41,7 @@ __END__
 
 =head1 NAME
 
-mok - mok - an awk for molecules
+mok - an awk for molecules
 
 =head1 SYNOPSIS
 
@@ -60,10 +60,12 @@ inspired by the AWK programming language by Aho, Kernighan, and Weinberger,
 the SMARTS molecular pattern description language by Daylight, Inc., and the
 Perl programming language by Larry Wall.
 
-Mok takes its name from Ookla the mok, an unforgettable character from the
+Mok takes its name from Ookla the Mok, an unforgettable character from the
 animated TV series "Thundarr the Barbarian", and from shortening "molecular
-awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
+awk".  For more details about the Mok mini-language, see LANGUAGE SPECIFICATION
 below.
+
+Mok is part of the PerlMol project, L<http://www.perlmol.org>.
 
 =head1 OPTIONS
 
@@ -91,7 +93,7 @@ include mdl, sdf, smiles, formula, mopac, pdb.
 
 =head1 LANGUAGE SPECIFICATION
 
-A mok script consists of a sequence of pattern-action statements and
+A Mok script consists of a sequence of pattern-action statements and
 optional subroutine definitions, in a manner very similar to the AWK
 language.
 
@@ -141,7 +143,7 @@ letter and turned off by giving the corresponding uppercase letter.
 
 =item g/G
 
-Match globally (default: off). When not present, the mok interpreter only
+Match globally (default: off). When not present, the Mok interpreter only
 matches a molecule once; when present, it tries matching again in other parts
 of the molecule. For example, /C/ matches butane only once (at an unspecified
 atom), while /C/g matches four times (once at each atom).
@@ -163,26 +165,46 @@ two different permutations (forwards and backwards).
 
 =head2 Special Variables
 
-When blocks with action statements are executed, the following variables
-are defined automatically:
+When blocks with action statements are executed, some variables are defined
+automatically. The variables are local, so you can do whatever you want with
+them with no side effects. However, the objects themselves may be altered by
+using their methods.
+
+NOTE: Mok 0.10 defined $file, $mol, $match, and $patt in lowercase. While they
+still work, the lowercase variables are deprecated and may be removed in the
+future.
 
 =over
 
-=item $file
+=item $FILE
 
 The current filename.
 
-=item $mol
+=item $MOL
 
-The current molecule as a Chemistry::Mol object.
+A reference to the current molecule as a Chemistry::Mol object.
 
-=item $match
+=item $MATCH
 
-The current match as a Chemistry::Pattern object.
+A reference to the current match as a Chemistry::Pattern object.
 
-=item $patt
+=item $PATT
 
 The current pattern as a SMILES string.
+
+=item @A
+
+The atoms that were matched. It is defined as @A = $MATCH->atom_map if a
+pattern was used, or @A = $MOL->atoms within an unconditional block.  Remember
+that this is a Perl array, so it is zero-based, unlike the one-based numbering
+used by most file types and some PerlMol methods.
+
+=item @B
+
+The bonds that were matched. It is defined as @A = $MATCH->bond_map if a
+pattern was used, or @A = $MOL->bonds within an unconditional block.  Remember
+Remember that this is a Perl array, so it is zero-based, unlike the one-based
+numbering used by most file types and some PerlMol methods.
 
 =back
 
@@ -205,30 +227,41 @@ funcions such as next and last:
 
 =head1 EXAMPLES
 
-    mok 'print $mol->name, "\n"' *.sdf
+Print the names of all the molecules found in all the .sdf files in the 
+current directory:
 
-Prints the names of all the molecules found in all the .sdf files in the 
-current directory.
+    mok 'print $MOL->name, "\n"' *.sdf
 
-    mok '/C(=O)OC/{ printf "$file: %s (%s)\n", 
-        $mol->name, $mol->formula }' *.mol
+Find esters among *.mol; print the filename, molecule name, and formula:
 
-Finds esters among *.mol; prints the filename, molecule name, and formula.
+    mok '/C(=O)OC/{ printf "$FILE: %s (%s)\n", 
+        $MOL->name, $MOL->formula }' *.mol
 
-    mok '{ $n += $mol->atoms } END { print "Total: $n atoms\n" }' *.mol
+Find out the total number of atoms:
 
-Find out the total number of atoms.
+    mok '{ $n += $MOL->atoms } END { print "Total: $n atoms\n" }' *.mol
 
-    mok '/CS/g{ $n++; $l += $match->bond_map(0)->length }
-        END { printf "Average C-S bond length: %.3f\n", $l/$n; }' *.mol
+Find out the average C-S bond length:
 
-Find out the average C-S bond length.
+    mok '/CS/g{ $n++; $len += $B[0]->length }
+        END { printf "Average C-S bond length: %.3f\n", $len/$n; }' *.mol
+
+Convert PDB files to MDL molfiles:
+
+    mok '{ $FILE =~ s/pdb/mol/; $MOL->write($FILE, format => "mdlmol") }' *.pdb
 
 =head1 SEE ALSO
 
 awk(1), perl(1)
-L<Chemistry::Mol>, L<Chemistry::Pattern>
-L<http://dmoz.org/Arts/Animation/Cartoons/Titles/T/Thundarr_the_Barbarian/>
+L<Chemistry::Mok>,
+L<Chemistry::Mol>, L<Chemistry::Pattern>,
+L<http://dmoz.org/Arts/Animation/Cartoons/Titles/T/Thundarr_the_Barbarian/>.
+
+The PerlMol project site at L<http://www.perlmol.org>.
+
+=head1 VERSION
+
+0.15
 
 =head1 AUTHOR
 

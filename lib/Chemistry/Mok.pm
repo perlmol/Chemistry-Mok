@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.10';
+$VERSION = '0.15';
 use strict;
 use warnings;
 use Chemistry::Mol;
@@ -124,6 +124,9 @@ sub compile_blocks {
             no warnings;
             sub {
                 my (\$mol, \$file, \$match, \$patt) = \@_;
+                my (\$MOL, \$FILE, \$MATCH, \$PATT) = \@_;
+                my (\@A) = \$MATCH ? \$MATCH->atom_map : \$MOL->atoms;
+                my (\@B) = \$MATCH ? \$MATCH->bond_map : \$MOL->bonds;
                 $block->{block};
             }
 END
@@ -214,9 +217,13 @@ __END__
 
 =back
 
+=head1 VERSION
+
+0.15
+
 =head1 SEE ALSO
 
-mok(1)
+L<mok>
 
 =head1 AUTHOR
 

@@ -7,7 +7,6 @@ if ($@) {
     plan skip_all => "You don't have Test::Pod installed";
 } else {
     plan tests => $n;
-
 }
 
 for my $file (@files) {

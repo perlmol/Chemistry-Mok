@@ -1,5 +1,15 @@
 Revision history for Perl extension Chemistry::Mok.
 
+0.15  Tue Mar 4 2004
+        - Bug fixes: pattern options were ignored, -f option didn't work.
+        - Changes: special variables $MOL, $PATT, $FILE, $MATCH are now 
+        uppercase.
+        - Features: new special variables @A and @B.
+        - Documentation: fixed some errors, revised examples.
+        - Tests: added a few simple tests, based on the examples in the POD.
+        See *.mok. The tests use the *.mol files that are provided. Note that
+        Chemistry::File::MDLMol must be installed for the tests to work.
+
 0.10  Mon Mar 1 2004
         - First release
 
