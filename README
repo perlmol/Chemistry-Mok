@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.21
+Chemistry/Mok version 0.22
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,10 +17,9 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.20
-        - Added the println function.
-        - Changed tests for better MSWin32 compatibility.
-        - Made SMARTS the default pattern language; added -p option.
+CHANGES SINCE VERSION 0.21
+        - Make sure molecules are read by their default classes instead
+          of Chemistry::Mol.
 
 INSTALLATION
 
@@ -34,10 +33,10 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-        'Chemistry::Mol' => 0.23,
-        'Chemistry::Pattern' => 0.10,
-        'Chemistry::File::SMARTS' => 0.10,
-        'Chemistry::Bond::Find' => 0.20,
+        'Chemistry::Mol' => 0.25,
+        'Chemistry::Pattern' => 0.21,
+        'Chemistry::File::SMARTS' => 0.11,
+        'Chemistry::Bond::Find' => 0.21,
         'Test::Simple' => 0,
         'Scalar::Util' => 1.01,
         'Text::Balanced' => 1.87,

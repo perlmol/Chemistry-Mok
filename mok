@@ -3,7 +3,7 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.21';
+$VERSION = '0.22';
 use strict;
 use warnings;
 use Chemistry::Mok;
@@ -40,7 +40,7 @@ Read each molecular file and run CODE on each. Options:
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
     -f FILE     run the code from FILE instead of the command line
     -t TYPE     assume that every file has the specified TYPE
-    -p TYPE     parse patterns using the specified TYPE. Default: SMARTS
+    -p TYPE     parse patterns using the specified TYPE. Default: 'smarts'
     -b          find bonds
 EOF
     exit;
@@ -97,6 +97,11 @@ Print usage information and exit
 Assume that every file has the specified TYPE. Available types depend on
 which Chemistry::File modules are installed, but currently available types
 include mdl, sdf, smiles, formula, mopac, pdb.
+
+=item -p TYPE     
+
+Parse patterns using the specified TYPE. Default: 'smarts'. Other options are
+'smiles' and 'midas'.
 
 =item -b
 
@@ -283,7 +288,7 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.21
+0.22
 
 =head1 AUTHOR
 

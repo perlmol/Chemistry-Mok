@@ -1,5 +1,9 @@
 Revision history for Perl extension Chemistry::Mok.
 
+0.22  Sat Jul 03 2004
+        - Make sure molecules are read by their default classes instead
+          of Chemistry::Mol.
+
 0.21  Fri Jun 18 2004
         - Made SMARTS the default pattern language; added -p option.
         - Added the println function.

@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.21';
+$VERSION = '0.22';
 # $Id$
 
 use strict;
@@ -237,7 +237,8 @@ sub run {
     # MAIN LOOP
     my $mol_class = $opt->{mol_class} || "Chemistry::Mol";
     FILE: for my $file (@args) {
-        my (@mols) = $mol_class->read($file, format => $opt->{format});
+        my (@mols) = $mol_class->read($file, format => $opt->{format},
+            mol_class => $opt->{mol_class});
         MOL: for my $mol (@mols) {
             if ($opt->{find_bonds}) {
                 find_bonds($mol) unless $mol->bonds;
@@ -266,7 +267,7 @@ __END__
 
 =head1 VERSION
 
-0.21
+0.22
 
 =head1 SEE ALSO
 
