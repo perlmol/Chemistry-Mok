@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.16';
+$VERSION = '0.20';
 # $Id$
 
 use strict;
@@ -41,6 +41,7 @@ sub tokenize {
     my ($code) = @_;
 
     $code =~ s/\s*$//;
+    $code =~ s/^\s*#.*//g; # remove comments at the top of the file
     unless($code =~ /^\s*([\/{#]|sub|BEGIN|END)/) {
         $code = "{$code}"; # add implicit brackets for simple one-liners
     }
@@ -60,7 +61,7 @@ sub tokenize {
                 qr/[gopGOP]+/ },
         ],
     );
-    die $@ if $@;
+    die "Mok: error extracting: $@" if $@;
     #use Data::Dumper; print Dumper \@toks; print "$code\n";
     @toks;
 }
@@ -116,12 +117,12 @@ sub compile_subs {
             no warnings;
             $sub
 END
-        die $@ if $@;
+        die "Mok: error compiling sub: $@" if $@;
     }
 }
 
 sub compile_blocks {
-    my ($pack, @blocks) = @_;
+    my ($pack, $format, @blocks) = @_;
     my @compiled_blocks;
 
     for my $block (@blocks) {
@@ -139,13 +140,13 @@ sub compile_blocks {
                 $block->{block};
             }
 END
-        die $@ if $@;
+        die "Mol: Error compiling block: $@" if $@;
 
         my ($patt, $patt_str);
         if ($block->{patt}) {
             $block->{patt} =~ m#^/(.*)/$#;
             $patt_str = $1;
-            $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
+            $patt = Chemistry::Pattern->parse($patt_str, format => $format);
             $patt->attr(global => 1) if $block->{opts} =~ /g/;
             $patt->options(overlap => 0) if $block->{opts} =~ /O/;
             $patt->options(permute => 1) if $block->{opts} =~ /p/;
@@ -156,23 +157,47 @@ END
     \@compiled_blocks;
 }
 
-=item Chemistry::Mok->new($code, [$package])
+=item Chemistry::Mok->new($code, %options)
 
-Compile the code and return a Chemistry::Mok object. If $package is given,
-the code runs in the Chemistry::Mok::UserCode::$package package instead of
-the Chemistry::Mok::UserCode::Default package. Specifying a package name
-is recommended if you have more than one mok object, in order to avoid 
-namespace clashes.
+Compile the code and return a Chemistry::Mok object. Available options:
+
+=over
+
+=item C<package>
+
+If the C<package> option is given, the code runs in the
+Chemistry::Mok::UserCode::$options{package} package instead of the
+Chemistry::Mok::UserCode::Default package. Specifying a package name is
+recommended if you have more than one mok object and you are using global
+varaibles, in order to avoid namespace clashes.
+
+=item C<pattern_format>
+
+The name of the format which will be used for parsing slash-delimited patterns.
+Mok versions until 0.16 only used the 'smiles' format, but newer versions can
+use the 'smarts' format as well.
+
+=back
 
 =cut
 
 sub new {
-    my ($class, $code, $usr_pack) = @_;
-    $usr_pack ||= "Default"; 
+    my ($class, $code, @a) = @_;
+    my %opts;
+    unshift @a, "package" if (@a == 1);
+    %opts = @a;
+        
+    my $usr_pack = $opts{package} || "Default"; 
+    my $format   = $opts{pattern_format} || "smiles"; 
+
+    # import convenience functions into the user's namespace
+    eval "package Chemistry::Mok::UserCode::$usr_pack;
+          Chemistry::Atom->import(':all');
+          Math::VectorReal->import(':all');";  
     my @toks = tokenize($code);
     my ($subs, $blocks) = parse(@toks);
     compile_subs($usr_pack, @$subs);
-    my $mok = compile_blocks($usr_pack, @$blocks);
+    my $mok = compile_blocks($usr_pack, $format, @$blocks);
     bless $mok, ref $class || $class;
 }
 
@@ -194,8 +219,11 @@ tries to identify the format automatically.
 
 =item find_bonds
 
-The format used when calling $mol_class->read. If not given, $mol_class->read
-tries to identify the format automatically.
+If set to a true value, find bonds. Use it when reading files with no bond
+information but 3D coordinates to detect the bonds if needed (for example, if
+you want to do match a pattern that includes bonds). If the file has explicit
+bonds, mok will not try to find the bonds, but it will reassign the bond orders
+from scratch.
 
 =back
 
@@ -228,8 +256,6 @@ sub run {
     }
 }
 
-package Chemistry::Mok::UserCode;
-use Chemistry::Atom ':all';
 
 __END__
 
@@ -237,7 +263,7 @@ __END__
 
 =head1 VERSION
 
-0.16
+0.20
 
 =head1 SEE ALSO
 

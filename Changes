@@ -1,6 +1,11 @@
 Revision history for Perl extension Chemistry::Mok.
 
-0.16
+0.20  Thu Jun 10 2004
+        - Support for different pattern languages.
+        - User package now imports from Chemistry::Atom and Math::VectorReal.
+        - Fixed error when an implicit block had leading comments.
+
+0.16  Wed May 19 2004
         - Added -b option (add bonds)
         - Added support for comments outside action blocks
         - Fixed undef $/ bug.

@@ -3,14 +3,14 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.16';
+$VERSION = '0.20';
 use strict;
 use warnings;
 use Chemistry::Mok;
 use Getopt::Std;
 
 my %opt;
-getopts('c:f:t:hvb', \%opt);
+getopts('c:f:t:hvbs', \%opt);
 usage() if $opt{h};
 
 my $code;
@@ -22,7 +22,8 @@ if ($opt{f}) {
     $code = shift || usage();
 }
 
-my $mok = Chemistry::Mok->new($code);
+my $mok = Chemistry::Mok->new($code, 
+    pattern_format => $opt{s} ? 'smarts' : 'smiles');
 $mok->run({ mol_class => $opt{c}, format => $opt{t}, 
     find_bonds => $opt{b} }, @ARGV);
 
@@ -96,7 +97,7 @@ include mdl, sdf, smiles, formula, mopac, pdb.
 Find bonds. Use it when reading files with no bond information but 3D
 coordinates to detect the bonds if needed (for example, if you want to do match
 a pattern that includes bonds). If the file has explicit bonds, mok will not
-try to find the bonds, but it will reassing the bond orders from scratch.
+try to find the bonds, but it will reassign the bond orders from scratch.
 
 =back
 
@@ -271,7 +272,7 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.16
+0.20
 
 =head1 AUTHOR
 

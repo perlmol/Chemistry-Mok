@@ -1,4 +1,8 @@
+#!/home/ivan/bin/perl
 # this is a mok program with comments
+
+# this is a hack to make the program executable
+BEGIN { $0 =~ /(^|\/)mok$/ or exec "mok -f $0 @ARGV" }
 
 # block for each molecule
 { 

@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.16
+Chemistry/Mok version 0.20
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,10 +17,10 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.15
-        - Added -b option (add bonds)
-        - Added support for comments outside action blocks
-        - Fixed undef $/ bug.
+CHANGES SINCE VERSION 0.16
+    - Support for different pattern languages.
+    - User package now imports from Chemistry::Atom and Math::VectorReal.
+    - Fixed error when an implicit block had leading comments.
 
 INSTALLATION
 
