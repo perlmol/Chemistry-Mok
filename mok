@@ -14,7 +14,7 @@ sub parse_code {
     my ($code) = @_;
     my ($patt_str, $patt_opts, $block) = $code =~ m<^\s*
         (?:
-            /(.*?)/[gop]*)\s*  # pattern
+            /(.*?)/([goOpP]*)\s*  # pattern
         )?
         {(.*)}          # code block
     >sxg;
@@ -35,9 +35,11 @@ END
     my $patt;
     if ($patt_str) {
         $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
-        if ($patt_opts =~ /g/i) {
-            $patt->attr(global => 1);
-        }
+        $patt->attr(global => 1) if $patt_opts =~ /g/;
+        $patt->options(overlap => 1) if $patt_opts =~ /o/;
+        $patt->options(overlap => 0) if $patt_opts =~ /O/;
+        $patt->options(permute => 1) if $patt_opts =~ /p/;
+        $patt->options(permute => 0) if $patt_opts =~ /P/;
     } 
     ($sub, $patt);
 }
