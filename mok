@@ -202,7 +202,7 @@ the SMARTS molecular pattern description language by Daylight, Inc., and the
 Perl programming language by Larry Wall.
 
 Mok takes its name from Ookla the mok, an unforgettable character from the
-animated TV series "Thundar the Barbarian", and from shortening "molecular
+animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 below.
 
@@ -365,6 +365,7 @@ Find out the average C-S bond length.
 
 awk(1), perl(1)
 L<Chemistry::Mol>, L<Chemistry::Pattern>
+L<http://dmoz.org/Arts/Animation/Cartoons/Titles/T/Thundarr_the_Barbarian/>
 
 =head1 AUTHOR
 
