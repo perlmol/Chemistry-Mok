@@ -1,0 +1,8 @@
+Changes
+MANIFEST			This list of files
+Makefile.PL
+README
+lib/Chemistry/Mok.pm
+mok
+t/1.t
+t/pod.t

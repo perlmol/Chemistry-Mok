@@ -1,140 +1,19 @@
 #!/home/ivan/bin/perl
 
+# mok command line interpreter. This is part of the Chemistry::Mok
+# distribution.
+
+$VERSION = '0.10';
 use strict;
 use warnings;
-use Chemistry::Mol;
-use Chemistry::File ':auto';
-use Chemistry::Pattern;
+use Chemistry::Mok;
 use Getopt::Std;
-use Text::Balanced ':ALL';
-use Scalar::Util 'blessed';
-
-sub tokenize {
-    my ($code) = @_;
-
-    $code =~ s/\s*$//;
-    unless($code =~ /^\s*([\/{]|sub|BEGIN|END)/) {
-        $code = "{$code}"; # add implicit brackets for simple one-liners
-    }
-    # (patt opt?)? code | sub code
-    my @toks = extract_multiple(my $c = $code,
-        [
-            { 'Chemistry::Mok::Patt' => 
-                sub { scalar extract_delimited($_[0],'/') } },
-            { 'Chemistry::Mok::Sub'  => 
-                qr/\s*(END|BEGIN|sub \w+)\s*/ },
-            { 'Chemistry::Mok::Block' => 
-                sub { scalar extract_codeblock($_[0],'{') } },
-            { 'Chemistry::Mok::Opts' => 
-                qr/[gopGOP]+/ },
-        ],
-    );
-    die $@ if $@;
-    #use Data::Dumper; print Dumper \@toks; print "$code\n";
-    @toks;
-}
-
-sub parse {
-    my (@toks)  = @_;
-
-    my (@subs, @blocks);
-    for my $tok (@toks) {
-        blessed $tok or die "unparsable token '$tok'\n";
-    }
-    while (my $tok = shift @toks) {
-        #print "tok = $$tok\n";
-        if ($tok->isa("Chemistry::Mok::Sub")) {
-            my $next = shift @toks 
-                or die "unexpected end of mok program after $$tok\n";
-            if ($next->isa("Chemistry::Mok::Block")) {
-                push @subs, "$$tok $$next";
-            } else {
-                die "unexpected token $$tok after Sub; expected Block\n";
-            }
-        } elsif ($tok->isa("Chemistry::Mok::Patt")) {
-            my $next = shift @toks
-                or die "unexpected end of mok program after $$tok\n";
-            my $opts = '';
-            if ($next->isa("Chemistry::Mok::Opts")) {
-                $opts = $$tok;
-                $next = shift @toks
-                    or die "unexpected end of mok program after $$tok\n";
-            }
-            if ($next->isa("Chemistry::Mok::Block")) {
-                push @blocks, { patt => $$tok, opts => $opts, block => $$next};
-            } else {
-                die "unexpected token $$tok after Patt; expected Block\n";
-            }
-        } elsif ($tok->isa("Chemistry::Mok::Block")){
-            push @blocks, { patt => '', opts => '', block => $$tok};
-        } else {
-            die "unexpected token $$tok\n";
-        }
-    }
-    \@subs, \@blocks;
-}
-
-sub compile_subs {
-    my (@subs) = @{$_[0]};
-    for my $sub (@subs) {
-        eval <<END;
-            package Chemistry::Mok::UserCode;
-            no strict;
-            no warnings;
-            $sub
-END
-        die $@ if $@;
-    }
-}
-
-sub compile_blocks {
-    my (@blocks) = @{$_[0]};
-    my @compiled_blocks;
-
-    for my $block (@blocks) {
-        my $code = $block->{block};
-        my $sub = eval <<END;
-            package Chemistry::Mok::UserCode;
-            no strict;
-            no warnings;
-            sub {
-                my (\$mol, \$file, \$match, \$patt) = \@_;
-                $block->{block};
-            }
-END
-        die $@ if $@;
-
-        my ($patt, $patt_str);
-        if ($block->{patt}) {
-            $block->{patt} =~ m#^/(.*)/$#;
-            $patt_str = $1;
-            $patt = Chemistry::Pattern->parse($patt_str, format => 'smiles');
-            $patt->attr(global => 1) if $block->{opts} =~ /g/;
-            $patt->options(overlap => 0) if $block->{opts} =~ /O/;
-            $patt->options(permute => 1) if $block->{opts} =~ /p/;
-        } 
-        push @compiled_blocks, {'sub' => $sub, 
-            patt => $patt, patt_str => $patt_str};
-    }
-    @compiled_blocks;
-}
-
-sub parse_code {
-    my ($code) = @_;
-    my ($patt_str, $patt_opts, $block) ;
-
-    my @toks = tokenize($code);
-    my ($subs, $blocks) = parse(@toks);
-    compile_subs($subs);
-    return compile_blocks($blocks);
-}
 
 my %opt;
-getopts('f:t:hv', \%opt);
+getopts('c:f:t:hv', \%opt);
 usage() if $opt{h};
 
 my $code;
-
 if ($opt{f}) {
     open F, "< $opt{f}" or die "Couldn't read $opt{f}\n";
     {local undef $/; $code = <F>;}
@@ -143,44 +22,24 @@ if ($opt{f}) {
     $code = shift || usage();
 }
 
-my (@blocks) = parse_code($code);
-
-# MAIN LOOP
-FILE: for my $file (@ARGV) {
-    my (@mols) = Chemistry::Mol->read($file, format => $opt{t});
-    MOL: for my $mol (@mols) {
-        BLOCK: for my $block (@blocks) {
-            my ($code_block, $patt, $patt_str) = 
-                @{$block}{qw(sub patt patt_str)};
-            if ($patt) {
-                MATCH: while ($patt->match($mol)) {
-                    $code_block->($mol, $file, $patt, $patt_str);
-                    last unless $patt->attr('global');
-                }
-            } else {
-                $code_block->($mol, $file, $patt, $patt_str);
-            }
-        }
-    }
-}
+my $mok = Chemistry::Mok->new($code);
+$mok->run({ mol_class => $opt{c}, format => $opt{f} }, @ARGV);
 
 sub usage {
     print <<EOF;
 Usage: $0 [OPTION]...  'CODE' FILE...
 Read each molecular file and run CODE on each. Options:
     -h          this help
-    -t TYPE     assume that every file has the specified TYPE
+    -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
     -f FILE     run the code from FILE instead of the command line
+    -t TYPE     assume that every file has the specified TYPE
 EOF
     exit;
 }
 
-package Chemistry::Mok::UserCode;
-use Chemistry::Atom ':all';
-
 __END__
 
-=head1 TITLE
+=head1 NAME
 
 mok - mok - an awk for molecules
 
@@ -209,6 +68,10 @@ below.
 =head1 OPTIONS
 
 =over
+
+=item -c CLASS
+
+Use CLASS instead of Chemistry::Mol to read molecules
 
 =item -f FILE
 
