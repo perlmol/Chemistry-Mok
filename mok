@@ -3,7 +3,7 @@
 # Mok command line interpreter. This is part of the Chemistry::Mok
 # distribution.
 
-$VERSION = '0.24';
+our $VERSION = '0.25';
 use strict;
 use warnings;
 no warnings qw(once);
@@ -13,7 +13,7 @@ use Getopt::Std;
 $| = 1; # don't buffer stdio
 
 my %opt;
-getopts('c:f:t:hvbp:dazD', \%opt);
+getopts('c:f:t:hvbp:dazD3', \%opt);
 usage() if $opt{h};
 
 my $code;
@@ -32,7 +32,8 @@ if ($^O eq 'MSWin32') { # do our own globbing under Windows
 
 $Chemistry::Mok::DEBUG = 1 if $opt{D};
 my $mok = Chemistry::Mok->new($code, 
-    pattern_format => $opt{p} || 'smarts');
+    pattern_format => $opt{p} || 'smarts',
+);
 
 
 $mok->run(
@@ -42,14 +43,17 @@ $mok->run(
         find_bonds      => $opt{b},
         delete_dummies  => $opt{d},
         aromatize       => $opt{a},
+        build_3d        => $opt{3},
     }, 
     @files
 );
 
 sub usage {
     print <<EOF;
+mok version $VERSION
 Usage: $0 [OPTION]...  'CODE' FILE...
 Read each molecular file and run CODE on each. Options:
+    -3          generate 3D coordinates using Chemistry::3DBuilder
     -a          "aromatize" each molecule as it is read
     -b          find bonds from 3D coordinates
     -c CLASS    use CLASS instead of Chemistry::Mol to read molecules
@@ -96,6 +100,10 @@ Mok is part of the PerlMol project, L<http://www.perlmol.org>.
 =head1 OPTIONS
 
 =over
+
+=item -3
+
+Generate 3D coordinates using Chemistry::3DBuilder.
 
 =item -a          
 
@@ -254,6 +262,12 @@ A reference to the current match as a Chemistry::Pattern object.
 
 The current pattern as a string.
 
+=item $FH
+
+The current input filehandle. This provides low-level access in case you want
+to rewind or seek into the file, tell the current position, etc. Playing with
+$FH may break things if you are not careful. Use at your own risk!
+
 =item @A
 
 The atoms that were matched. It is defined as @A = $MATCH->atom_map if a
@@ -338,7 +352,7 @@ The PerlMol project site at L<http://www.perlmol.org>.
 
 =head1 VERSION
 
-0.24
+0.25
 
 =head1 AUTHOR
 

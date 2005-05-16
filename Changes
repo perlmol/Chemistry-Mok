@@ -1,5 +1,17 @@
 Revision history for Perl extension Chemistry::Mok.
 
+0.25  May 16 2005
+        - Read one molecule at a time using the Chemistry-Mol-0.30 interface.
+        - New special variable $FH
+        - Added support for Chemistry::3DBuilder (-3 command-line option)
+        - Add #line to the generated code so that errors give more meaninful
+          line numbers.
+        - Fixed parsing bug where the first block used an explicit pattern
+          language
+        - Restructured Chemistry::Mok to be more object-oriented: 
+        - WARNING: the mok object is now a hash reference instead of an array
+          reference. This may affect derived classes.
+
 0.24  Mar 4 2005
         - Added -D option
         - Added support for multiple pattern languages on the same

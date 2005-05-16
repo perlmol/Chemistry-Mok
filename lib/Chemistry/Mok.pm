@@ -1,6 +1,6 @@
 package Chemistry::Mok;
 
-$VERSION = '0.24';
+$VERSION = '0.25';
 # $Id$
 
 use strict;
@@ -10,6 +10,7 @@ use Chemistry::File ':auto';
 use Chemistry::Pattern;
 use Chemistry::Bond::Find qw(find_bonds assign_bond_orders);
 use Chemistry::Ring 'aromatize_mol';
+use Chemistry::3DBuilder 'build_3d';
 use Text::Balanced ':ALL';
 use Scalar::Util 'blessed';
 use Data::Dumper;
@@ -43,11 +44,13 @@ L<http://www.perlmol.org>.
 =cut
 
 sub tokenize {
-    my ($code) = @_;
+    my ($self, $code) = @_;
 
-    $code =~ s/\s*$//;
-    $code =~ s/^\s*#.*//g; # remove comments at the top of the file
-    unless($code =~ /^\s*([\/{#]|sub|BEGIN|END)/) {
+    $code =~ s/\s*$//; # Text::Balanced complains about trailing whitespace
+    #$code =~ s/^\s*#.*//g; # remove comments at the top of the file
+    #unless($code =~ /^\s*([\/{#]|sub|BEGIN|END)/) {
+    unless($code =~ /^(\s*#.*)*\s*([\/{]|sub|BEGIN|END|\w+:\s*\/)/) {
+        print "MOK: adding implicit braces\n" if $DEBUG;
         $code = "{$code}"; # add implicit brackets for simple one-liners
     }
     #print "code = '$code'\n";
@@ -59,23 +62,23 @@ sub tokenize {
             { 'Chemistry::Mok::Patt' => 
                 sub { scalar extract_delimited($_[0],'/') } },
             { 'Chemistry::Mok::Sub'  => 
-                qr/\s*(END|BEGIN|sub\s\w+)\s*/ },
+                qr/\s*(?:END|BEGIN|sub\s+\w+)\s*/ },
             { 'Chemistry::Mok::Block' => 
                 sub { scalar extract_codeblock($_[0],'{') } },
             { 'Chemistry::Mok::PattLang' => 
-                qr/\s*(\w+):(?=\s*\/)/ },
+                qr/(\s*\w+):(?=\s*\/)/ },
             { 'Chemistry::Mok::Opts' => 
                 qr/[gopGOP]+/ },
         ],
     );
     die "Mok: error extracting: $@" if $@;
-    print "TOKENS:\n", Dumper(\@toks), "\nCODE:<<<<$code>>>>\n\n"
+    print "MOK: TOKENS:\n", Dumper(\@toks), "\nCODE:<<<<$code>>>>\n\n"
         if $DEBUG;
     @toks;
 }
 
 sub parse {
-    my (@toks)  = @_;
+    my ($self, @toks)  = @_;
 
     my (@subs, @blocks);
     for my $tok (@toks) {
@@ -87,7 +90,13 @@ sub parse {
     my $st = 1;
     my ($patt, $opts, $block, $sub, $pattlang) = ('') x 5;
     my ($save) = 0;
+    my $line;
+    my $next_line = 1;
     while (my $tok = shift @toks) {
+        $line = $next_line; 
+        $next_line += $$tok =~ y/\n//;
+        print "MOK: LINE=$line;\nTOK=<<<<$$tok>>>>;\nNEXT_LINE=$next_line\n\n" 
+            if $DEBUG;
         next if $tok->isa("Chemistry::Mok::Comment");
         if ($st == 1) {
             if ($tok->isa("Chemistry::Mok::Block")){
@@ -122,10 +131,11 @@ sub parse {
         }
         if ($save) { # save block and go back to state 1
             if ($sub) {
-                push @subs, "$sub $$tok";
+                push @subs, { block => "$sub $$tok", line => $line };
             } else {
                 push @blocks, { patt => $patt, opts => $opts, 
-                    pattlang => $pattlang, block => $$tok};
+                    pattlang => $pattlang, block => $$tok,
+                    line => $line};
             }
             $patt = $opts = $pattlang = $block = $sub = '';
             $st = 1,    $save = 0,  next;
@@ -133,44 +143,53 @@ sub parse {
             die "unexpected token '$$tok' (type '" . ref($tok) . "'\n";
         }
     }
-    print "BLOCKS\n", Dumper(\@blocks), "\nSUBS:\n", Dumper(\@subs), "\n"
+    print "MOK: BLOCKS\n", Dumper(\@blocks), "\nSUBS:\n", Dumper(\@subs), "\n"
         if $DEBUG;
 
     \@subs, \@blocks;
 }
 
 sub compile_subs {
-    my ($pack, @subs) = @_;
+    my ($self, @subs) = @_;
+    my $pack = $self->{package};
+
     for my $sub (@subs) {
-        eval <<END;
+        my $code = <<END;
             package Chemistry::Mok::UserCode::$pack;
             no strict;
             no warnings;
-            $sub
+#line $sub->{line} "mok code"
+            $sub->{block}
 END
+        print "MOK: COMPILING SUB: <<<<$code>>>>\n\n" if $DEBUG;
+        eval $code;
         die "Mok: error compiling sub: $@" if $@;
     }
 }
 
 sub compile_blocks {
-    my ($pack, $format, @blocks) = @_;
+    my ($self, @blocks) = @_;
+    my $pack = $self->{package};
+    my $format = $self->{pattern_format};
     my @compiled_blocks;
 
     for my $block (@blocks) {
         #use Data::Dumper; print Dumper $block;
-        my $code = $block->{block};
-        my $sub = eval <<END;
+        my $code = <<END;
             package Chemistry::Mok::UserCode::$pack;
             no strict;
             no warnings;
             sub {
                 my (\$mol, \$file, \$match, \$patt) = \@_;
-                my (\$MOL, \$FILE, \$MATCH, \$PATT) = \@_;
+                my (\$MOL, \$FILE, \$MATCH, \$PATT, \$FH) = \@_;
                 my (\@A) = \$MATCH ? \$MATCH->atom_map : \$MOL->atoms;
                 my (\@B) = \$MATCH ? \$MATCH->bond_map : \$MOL->bonds;
+#line $block->{line} "mok code"
                 $block->{block};
             }
 END
+        print "MOK: COMPILING BLOCK: <<<<$code>>>>\n\n" if $DEBUG;
+        my $sub = eval $code;
         die "Mol: Error compiling block: $@" if $@;
 
         my ($patt, $patt_str);
@@ -217,24 +236,43 @@ that don't define an explicit format. Mok versions until 0.16 only used the
 sub new {
     my ($class, $code, @a) = @_;
     my %opts;
+
+    # for backwards compatibility with Chemistry::Mok->new($code, $package)
     unshift @a, "package" if (@a == 1);
     %opts = @a;
         
-    my $usr_pack = $opts{package} || "Default"; 
-    my $format   = $opts{pattern_format} || "smarts"; 
+    my $self = bless {
+        'package'      => $opts{package} || "Default",
+        pattern_format => $opts{pattern_format} || "smarts",
+    }, $class;
 
+    $self->setup_package;
+    my @toks = $self->tokenize($code);
+    my ($subs, $blocks) = $self->parse(@toks);
+    $self->compile_subs(@$subs);
+    $self->{blocks} = $self->compile_blocks(@$blocks);
+    
+    return $self;
+}
+
+sub setup_package {
+    my ($self) = @_;
+    my $usr_pack = $self->{package};
     # import convenience functions into the user's namespace
     eval <<EVAL;
           package Chemistry::Mok::UserCode::$usr_pack;
-          Chemistry::Atom->import(':all');
-          Math::VectorReal->import(':all');
+          use Chemistry::Atom ':all';
+          use Chemistry::Ring ':all';
+          use Chemistry::Ring::Find ':all';
+          use Chemistry::Bond::Find ':all';
+          use Chemistry::Canonicalize ':all';
+          use Chemistry::InternalCoords::Builder ':all';
+          use Chemistry::Isotope ':all';
+          use Math::VectorReal ':all';
+          use Chemistry::3DBuilder ':all';
           sub println { print "\@_", "\n" }
 EVAL
-    my @toks = tokenize($code);
-    my ($subs, $blocks) = parse(@toks);
-    compile_subs($usr_pack, @$subs);
-    my $mok = compile_blocks($usr_pack, $format, @$blocks);
-    bless $mok, ref $class || $class;
+    die "Mok: error setting up 'Chemistry::Mok::UserCode::$usr_pack' $@" if $@;
 }
 
 =item $mok->run($options, @args)
@@ -243,6 +281,10 @@ Run the code on the filenames contained in @args. $options is a hash reference
 with runtime options. Available options:
 
 =over
+
+=item build_3d
+
+Generate 3D coordinates using Chemistry::3DBuilder.
 
 =item aromatize          
 
@@ -281,32 +323,45 @@ sub run {
     # MAIN LOOP
     my $mol_class = $opt->{mol_class} || "Chemistry::Mol";
     FILE: for my $file (@args) {
-        my (@mols) = $mol_class->read(
-            $file, 
+        #my (@mols) = $mol_class->read(
+        my %reader_opts = (
             format      => $opt->{format},
             mol_class   => $opt->{mol_class},
         );
-        MOL: for my $mol (@mols) {
-            if ($opt->{delete_dummies}) {
-                $_->delete for grep { ! $_->Z } $mol->atoms;
-            }
-            if ($opt->{find_bonds}) {
-                find_bonds($mol) unless $mol->bonds;
-                assign_bond_orders($mol);
-            }
-            if ($opt->{aromatize}) {
-                aromatize_mol($mol);
-            }
-            BLOCK: for my $block (@$self) {
-                my ($code_block, $patt, $patt_str) = 
-                    @{$block}{qw(sub patt patt_str)};
-                if ($patt) {
-                    MATCH: while ($patt->match($mol)) {
-                        $code_block->($mol, $file, $patt, $patt_str);
-                        last unless $patt->attr('global');
+        my $reader = $mol_class->file(
+            $file, 
+            %reader_opts,
+        );
+        $reader->open('<');
+        $reader->read_header;
+        while (my @mols  = $reader->read_mol($reader->fh, %reader_opts)) {
+            MOL: for my $mol (@mols) {
+                if ($opt->{delete_dummies}) {
+                    $_->delete for grep { ! $_->Z } $mol->atoms;
+                }
+                if ($opt->{find_bonds}) {
+                    find_bonds($mol) unless $mol->bonds;
+                    assign_bond_orders($mol);
+                }
+                if ($opt->{aromatize}) {
+                    aromatize_mol($mol);
+                }
+                if ($opt->{build_3d}) {
+                    build_3d($mol);
+                }
+                BLOCK: for my $block (@{$self->{blocks}}) {
+                    my ($code_block, $patt, $patt_str) = 
+                        @{$block}{qw(sub patt patt_str)};
+                    if ($patt) {
+                        MATCH: while ($patt->match($mol)) {
+                            $code_block->($mol, $file, $patt, 
+                                $patt_str, $reader->fh);
+                            last unless $patt->attr('global');
+                        }
+                    } else {
+                        $code_block->($mol, $file, $patt, 
+                            $patt_str, $reader->fh);
                     }
-                } else {
-                    $code_block->($mol, $file, $patt, $patt_str);
                 }
             }
         }
@@ -321,7 +376,7 @@ __END__
 
 =head1 VERSION
 
-0.24
+0.25
 
 =head1 SEE ALSO
 

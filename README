@@ -1,4 +1,4 @@
-Chemistry/Mok version 0.24
+Chemistry/Mok version 0.25
 ==========================
 
 The purpose of mok is to read all the molecules found in the files that are
@@ -17,9 +17,17 @@ animated TV series "Thundarr the Barbarian", and from shortening "molecular
 awk".  For more details about the mok mini-language, see LANGUAGE SPECIFICATION
 in the man page.
 
-CHANGES SINCE VERSION 0.23
-    - Added -D option
-    - Added support for multiple pattern languages on the same script.
+CHANGES SINCE VERSION 0.24
+        - Read one molecule at a time using the Chemistry-Mol-0.30 interface.
+        - New special variable $FH
+        - Added support for Chemistry::3DBuilder (-3 command-line option)
+        - Add #line to the generated code so that errors give more meaninful
+          line numbers.
+        - Fixed parsing bug where the first block used an explicit pattern
+          language
+        - Restructured Chemistry::Mok to be more object-oriented: 
+        - WARNING: the mok object is now a hash reference instead of an array
+          reference. This may affect derived classes.
 
 INSTALLATION
 
@@ -33,7 +41,7 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-        Chemistry::Mol          => 0.25,
+        Chemistry::Mol          => 0.30,
         Chemistry::Pattern      => 0.21,
         Chemistry::File::SMARTS => 0.11,
         Chemistry::Bond::Find   => 0.21,
